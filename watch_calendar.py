@@ -108,6 +108,6 @@ def main():
         print("changed")
     else:
         print("no change")
-post_discord(os.environ.get("DISCORD_WEBHOOK_URL"), "🔔 テスト通知です")
+
 if __name__ == "__main__":
     main()
