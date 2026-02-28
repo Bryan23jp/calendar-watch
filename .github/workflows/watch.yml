@@ -2,7 +2,7 @@ name: Watch Calendar Status
 
 on:
   schedule:
-    - cron: "*/15 * * * *" # 15分ごと
+    - cron: "*/5 * * * *" # 5分ごと
   workflow_dispatch:
 
 jobs:
