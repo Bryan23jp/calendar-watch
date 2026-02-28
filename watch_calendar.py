@@ -7,8 +7,7 @@ URL = "https://www.31sumai.com/attend/X2571/"
 STATE_FILE = "state.json"
 
 def post_discord(webhook, content):
-    r = requests.post(webhook, json={"content": content}, timeout=30)
-    r.raise_for_status()
+    requests.post(webhook, json={"content": content}, timeout=30)
 
 def load_state():
     if not os.path.exists(STATE_FILE):
@@ -29,51 +28,34 @@ def extract_calendar(page):
         month_key = f"{int(m.group(1)):04d}-{int(m.group(2)):02d}"
 
     table = page.locator("table.ui-datepicker-calendar")
-    if table.count() == 0:
-        raise RuntimeError("カレンダーが見つかりません")
-
     cells = table.locator("td")
+
     results = {}
 
     for i in range(cells.count()):
         cell = cells.nth(i)
 
         text = cell.inner_text().strip()
-
-        # 日付取得
         day_match = re.search(r"\b([1-9]|[12]\d|3[01])\b", text)
         if not day_match:
             continue
         day = day_match.group(1)
 
-        status = None
+        classes = cell.get_attribute("class") or ""
 
-        # ① 文字として存在する場合
-        for s in ["○", "◯", "△", "×", "－", "-"]:
-            if s in text:
-                status = "－" if s in ["－", "-"] else s
-                break
+        # 状態判定（クラスベース）
+        if "ui-state-disabled" in classes:
+            status = "－"
+        elif "ui-datepicker-unselectable" in classes:
+            status = "×"
+        else:
+            # クリック可能な日
+            status = "○"
 
-        # ② 画像アイコンの alt を見る
-        if not status:
-            imgs = cell.locator("img")
-            for j in range(imgs.count()):
-                alt = imgs.nth(j).get_attribute("alt")
-                if alt:
-                    if "余裕" in alt:
-                        status = "○"
-                    elif "満席" in alt:
-                        status = "×"
-                    elif "まもなく" in alt:
-                        status = "△"
-                    elif "受付不可" in alt:
-                        status = "－"
-
-        if status:
-            results[day] = status
+        results[day] = status
 
     if not results:
-        raise RuntimeError("ステータス取得に失敗しました")
+        raise RuntimeError("カレンダー取得失敗")
 
     return {month_key: results}
 
@@ -91,7 +73,7 @@ def main():
 
     webhook = os.environ.get("DISCORD_WEBHOOK_URL")
     if not webhook:
-        sys.exit("DISCORD_WEBHOOK_URL が設定されていません")
+        sys.exit("Webhook未設定")
 
     state = load_state()
     prev = state.get("calendar", {})
@@ -107,7 +89,6 @@ def main():
 
     if "calendar" not in state:
         state["calendar"] = cur
-        state["last_checked"] = datetime.utcnow().isoformat()
         save_state(state)
         print("initialized")
         return
@@ -123,7 +104,6 @@ def main():
         post_discord(webhook, msg)
 
         state["calendar"] = cur
-        state["last_checked"] = datetime.utcnow().isoformat()
         save_state(state)
         print("changed")
     else:
